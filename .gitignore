@@ -1,0 +1,17 @@
+node_modules/
+.env
+*.log
+.DS_Store
+package-lock.json
+
+# Sensitive files - DO NOT COMMIT
+*.json
+!package.json
+!package-lock.json
+
+# Google credentials
+gen-lang-client-*.json
+
+# Auth files (will be created on server)
+authorized-users.json
+pending-requests.json
