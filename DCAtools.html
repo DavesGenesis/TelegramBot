@@ -663,9 +663,10 @@
                                 <tr>
                                     <th>Milestone</th>
                                     <th>Total Contribution</th>
+                                    <th>Cumulative Withdrawal</th>
                                     <th>Redemption Value</th>
-                                    <th>Growth Amount</th>
-                                    <th>Growth %</th>
+                                    <th>Net Profit/Loss</th>
+                                    <th>Net Growth %</th>
                                 </tr>
                             </thead>
                             <tbody id="summaryTableBody">
@@ -1281,19 +1282,17 @@
 
             // Update Table Headers for accuracy
             const summaryTable = tbody.closest('table');
-            const newThead = `
-                <thead>
-                    <tr>
-                        <th>Milestone</th>
-                        <th>Total Contribution</th>
-                        <th>Cumulative Withdrawal</th>
-                        <th>Redemption Value</th>
-                        <th>Net Profit/Loss</th>
-                        <th>Net Growth %</th>
-                    </tr>
-                </thead>
+            const newTheadContent = `
+                <tr>
+                    <th>Milestone</th>
+                    <th>Total Contribution</th>
+                    <th>Cumulative Withdrawal</th>
+                    <th>Redemption Value</th>
+                    <th>Net Profit/Loss</th>
+                    <th>Net Growth %</th>
+                </tr>
             `;
-            summaryTable.querySelector('thead').innerHTML = newThead;
+            summaryTable.querySelector('thead').innerHTML = newTheadContent;
             
             summaryData.forEach(data => {
                 const row = document.createElement('tr');
@@ -1623,8 +1622,8 @@
             doc.setFontSize(8);
             doc.setFont('helvetica', 'bold');
             
-            const summaryHeaders = ['Milestone', 'Contribution', 'Redemption', 'Growth', 'Growth %'];
-            const summaryColWidths = [25, 32, 32, 32, 25];
+            const summaryHeaders = ['Milestone', 'Contribution', 'Cumul. Withdrawal', 'Redemption', 'Net Profit', 'Net Growth %'];
+            const summaryColWidths = [22, 28, 28, 28, 28, 22];
             xPos = margin + 2;
             summaryHeaders.forEach((header, i) => {
                 doc.text(header, xPos, yPos + 4.5);
@@ -1641,8 +1640,9 @@
             
             milestones.forEach((year, index) => {
                 const data = calculationData.projections[year - 1];
-                const growthAmount = data.redemptionValue - data.cumulativeContribution;
-                const growthPercent = (growthAmount / data.cumulativeContribution) * 100;
+                const totalValueRealized = data.totalValueRealized;
+                const netProfit = totalValueRealized - data.cumulativeContribution;
+                const netGrowthPercent = (netProfit / data.cumulativeContribution) * 100;
                 
                 // Alternate row colors
                 if (index % 2 === 0) {
@@ -1656,18 +1656,23 @@
                 xPos += summaryColWidths[0];
                 
                 doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...darkText);
                 doc.text(formatCurrency(data.cumulativeContribution), xPos, yPos + 4);
                 xPos += summaryColWidths[1];
-                doc.text(formatCurrency(data.redemptionValue), xPos, yPos + 4);
+                doc.text(formatCurrency(data.cumulativeWithdrawal), xPos, yPos + 4);
                 xPos += summaryColWidths[2];
-                
-                doc.setTextColor(16, 185, 129);
-                doc.setFont('helvetica', 'bold');
-                doc.text(formatCurrency(growthAmount), xPos, yPos + 4);
+                doc.text(formatCurrency(data.redemptionValue), xPos, yPos + 4);
                 xPos += summaryColWidths[3];
                 
+                // Color based on profit/loss
+                const profitColor = netProfit >= 0 ? [16, 185, 129] : [255, 100, 150];
+                doc.setTextColor(...profitColor);
+                doc.setFont('helvetica', 'bold');
+                doc.text(formatCurrency(netProfit), xPos, yPos + 4);
+                xPos += summaryColWidths[4];
+                
                 doc.setTextColor(100, 255, 218);
-                doc.text(growthPercent.toFixed(2) + '%', xPos, yPos + 4);
+                doc.text(netGrowthPercent.toFixed(2) + '%', xPos, yPos + 4);
                 
                 doc.setTextColor(...darkText);
                 yPos += 6;
@@ -1708,7 +1713,7 @@
             doc.setFontSize(7);
             doc.setFont('helvetica', 'normal');
             
-            const chartDesc = `This chart shows the growth of your investment over 40 years. The orange line represents your cumulative contributions, while the green line shows the redemption value including growth. The gap between the lines represents your investment gains.`;
+            const chartDesc = `This chart shows the growth of your investment over 40 years. The orange line represents your cumulative contributions, while the green line shows the Total Value Realized (remaining balance plus all withdrawals taken). The gap between the lines represents your net investment gains.`;
             const splitDesc = doc.splitTextToSize(chartDesc, pageWidth - 2 * margin - 8);
             doc.text(splitDesc, margin + 4, yPos + 12);
 
