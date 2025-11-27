@@ -1,0 +1,1831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DCA Investment Calculator - Genesis Advisory</title>
+    
+    <!-- Firebase SDK Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="broadcast-session-tracker.js"></script>
+    
+    <!-- Authentication Check -->
+    <script>
+        try {
+            const authData = JSON.parse(sessionStorage.getItem('waterfallAuth') || '{}');
+            if (!authData.authenticated) {
+                window.location.href = 'index.html';
+            }
+        } catch (error) {
+            window.location.href = 'index.html';
+        }
+    </script>
+    
+    <!-- Protection Scripts -->
+    <script>
+        // Disable right-click context menu
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            return false;
+        });
+
+        // Disable keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.keyCode === 123 || 
+                (e.ctrlKey && e.shiftKey && e.keyCode === 73) || 
+                (e.ctrlKey && e.shiftKey && e.keyCode === 74) || 
+                (e.ctrlKey && e.shiftKey && e.keyCode === 67) || 
+                (e.ctrlKey && e.keyCode === 85) || 
+                (e.ctrlKey && e.keyCode === 83)) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // Detect DevTools opening
+        (function() {
+            const threshold = 160;
+            let devtools = {open: false};
+            
+            setInterval(function() {
+                if (window.outerWidth - window.innerWidth > threshold || 
+                    window.outerHeight - window.innerHeight > threshold) {
+                    if (!devtools.open) {
+                        document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0a192f;color:#64ffda;font-family:Montserrat,sans-serif;font-size:24px;text-align:center;padding:20px;">⚠️ Developer Tools detected. Please close it to continue.</div>';
+                    }
+                    devtools.open = true;
+                } else {
+                    devtools.open = false;
+                }
+            }, 500);
+        })();
+
+        // Disable text selection and copy
+        document.addEventListener('selectstart', function(e) {
+            e.preventDefault();
+            return false;
+        });
+
+        document.addEventListener('copy', function(e) {
+            e.preventDefault();
+            return false;
+        });
+    </script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a192f;
+            --bg-card: #172a46;
+            --bg-card-darker: #111e35;
+            --bg-card-lighter: #1d3555;
+            --accent: #64ffda;
+            --accent-darker: #4ecdb8;
+            --text-primary: #e2e8f0;
+            --text-secondary: #a8b2c1;
+            --text-muted: #718096;
+            --border-color: #2d3748;
+            --danger: #ff6496;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        .highlight {
+            color: var(--accent);
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .card-header {
+            padding: 1.5rem 2rem 1rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-body {
+            padding: 2rem;
+        }
+
+        .card-title {
+            color: var(--text-primary);
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .input-field, select {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            color: var(--text-primary);
+            width: 100%;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1rem;
+        }
+
+        .input-field:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .btn {
+            background: var(--accent);
+            color: var(--bg-primary);
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .btn:hover {
+            background: var(--accent-darker);
+            transform: translateY(-2px);
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card-darker) 100%);
+            border-bottom: 2px solid var(--accent);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .header-title {
+            font-size: 2rem;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .header-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+
+        .summary-box {
+            background: var(--bg-card-darker);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border: 2px solid var(--accent);
+            margin-bottom: 2rem;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+
+        .summary-label {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .summary-value {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-card-darker);
+        }
+
+        th {
+            background: var(--bg-primary);
+            color: var(--accent);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--accent);
+            font-size: 0.85rem;
+        }
+
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        tr:hover {
+            background: var(--bg-card-lighter);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 2rem;
+        }
+
+        .break-even-box {
+            background: linear-gradient(135deg, var(--success) 0%, #0a7d5b 100%);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .break-even-box h3 {
+            color: white;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .break-even-box p {
+            color: white;
+            font-size: 1.1rem;
+            margin: 0.5rem 0;
+        }
+
+        .error-message {
+            color: var(--danger);
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        .floating-pdf-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+            padding: 1rem 1.5rem;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-family: 'Montserrat', sans-serif;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s;
+            font-size: 1rem;
+        }
+
+        .floating-pdf-btn:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+            background: #ff4070;
+        }
+
+        .floating-pdf-btn i {
+            font-size: 1.25rem;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .radio-option input[type="radio"] {
+            width: auto;
+            cursor: pointer;
+        }
+
+        .radio-option label {
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+
+        .conditional-field {
+            display: none;
+        }
+
+        .conditional-field.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .card-body {
+                padding: 1rem;
+            }
+            
+            .chart-container {
+                height: 300px;
+            }
+
+            th, td {
+                padding: 0.5rem;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h1 class="header-title">
+                    <i class="fas fa-chart-line"></i> DCA Investment <span class="highlight">Calculator</span>
+                </h1>
+                <p class="header-subtitle">40-Year Investment Projection with Dollar Cost Averaging</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1.25rem; background: var(--bg-card-darker); border-radius: 0.5rem; border: 1px solid var(--border-color);">
+                    <i class="fas fa-user" style="color: var(--accent);"></i>
+                    <div>
+                        <div id="userEmail" style="color: var(--text-secondary); font-size: 0.9rem;"></div>
+                    </div>
+                </div>
+                <button onclick="window.location.href='dashboard.html'" style="padding: 0.75rem 1.25rem; background: var(--accent); color: var(--bg-primary); border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-family: 'Montserrat', sans-serif;" title="Back to Dashboard">
+                    <i class="fas fa-home"></i> Dashboard
+                </button>
+                <button id="logoutBtn" style="padding: 0.75rem 1.25rem; background: var(--danger); color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-family: 'Montserrat', sans-serif;" title="Logout">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-user-edit"></i> Client Information & Investment Details</h2>
+            </div>
+            <div class="card-body">
+                <!-- Client Info -->
+                <div class="grid grid-2">
+                    <div class="input-group">
+                        <label class="input-label">Client Name</label>
+                        <input type="text" id="clientName" class="input-field" placeholder="Enter client name">
+                        <span id="nameError" class="error-message"></span>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">Gender</label>
+                        <select id="gender" class="input-field">
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                        <span id="genderError" class="error-message"></span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">Date of Birth</label>
+                    <input type="text" id="dob" class="input-field" placeholder="DD/MM/YYYY" maxlength="10">
+                    <p style="font-size: 0.75rem; margin-top: 0.5rem; color: var(--text-muted);">
+                        <i class="fas fa-info-circle"></i> Format: DD/MM/YYYY (Age 18-80)
+                    </p>
+                    <span id="dobError" class="error-message"></span>
+                </div>
+
+                <!-- Investment Type -->
+                <div class="input-group">
+                    <label class="input-label">Investment Type</label>
+                    <div class="radio-group">
+                        <div class="radio-option">
+                            <input type="radio" id="lumpsum" name="investmentType" value="lumpsum">
+                            <label for="lumpsum">Lump Sum</label>
+                        </div>
+                        <div class="radio-option">
+                            <input type="radio" id="installment" name="investmentType" value="installment">
+                            <label for="installment">Installment</label>
+                        </div>
+                    </div>
+                    <span id="investmentTypeError" class="error-message"></span>
+                </div>
+
+                <!-- Conditional Fields for Installment -->
+                <div id="installmentFields" class="conditional-field">
+                    <div class="grid grid-2">
+                        <div class="input-group">
+                            <label class="input-label">Payment Frequency</label>
+                            <div class="radio-group">
+                                <div class="radio-option">
+                                    <input type="radio" id="yearly" name="frequency" value="yearly">
+                                    <label for="yearly">Yearly</label>
+                                </div>
+                                <div class="radio-option">
+                                    <input type="radio" id="monthly" name="frequency" value="monthly">
+                                    <label for="monthly">Monthly</label>
+                                </div>
+                            </div>
+                            <span id="frequencyError" class="error-message"></span>
+                        </div>
+
+                        <div class="input-group">
+                            <label class="input-label">Payment Term</label>
+                            <select id="term" class="input-field">
+                                <option value="">Select Term</option>
+                                <option value="5">5 Years</option>
+                                <option value="10">10 Years</option>
+                            </select>
+                            <span id="termError" class="error-message"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contribution Amount -->
+                <div class="input-group">
+                    <label class="input-label">Contribution Amount (USD)</label>
+                    <input type="text" id="contributionAmount" class="input-field" placeholder="$10,000">
+                    <p style="font-size: 0.75rem; margin-top: 0.5rem; color: var(--text-muted);">
+                        <i class="fas fa-info-circle"></i> <span id="contributionHint">Enter your contribution amount</span>
+                    </p>
+                    <span id="contributionError" class="error-message"></span>
+                </div>
+
+                <!-- Growth Rate -->
+                <div class="input-group">
+                    <label class="input-label">Expected Growth Rate</label>
+                    <select id="growthRate" class="input-field">
+                        <option value="">Select Growth Rate</option>
+                        <option value="4">4% (Conservative)</option>
+                        <option value="6">6% (Balanced)</option>
+                        <option value="8">8% (Aggressive)</option>
+                    </select>
+                    <span id="growthRateError" class="error-message"></span>
+                </div>
+
+                <!-- Annual Withdrawal -->
+                <div class="input-group">
+                    <label class="input-label">Annual Withdrawal</label>
+                    <div class="radio-group">
+                        <div class="radio-option">
+                            <input type="radio" id="withdrawalNo" name="withdrawal" value="no" checked>
+                            <label for="withdrawalNo">No Withdrawal</label>
+                        </div>
+                        <div class="radio-option">
+                            <input type="radio" id="withdrawalYes" name="withdrawal" value="yes">
+                            <label for="withdrawalYes">Partial Withdrawal</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conditional Withdrawal Fields -->
+                <div id="withdrawalFields" class="conditional-field">
+                    <div class="grid grid-2">
+                        <div class="input-group">
+                            <label class="input-label">Annual Withdrawal Amount (USD)</label>
+                            <input type="text" id="withdrawalAmount" class="input-field" placeholder="$5,000">
+                            <span id="withdrawalAmountError" class="error-message"></span>
+                        </div>
+
+                        <div class="input-group">
+                            <label class="input-label">Start Withdrawal at Year</label>
+                            <input type="number" id="withdrawalStartYear" class="input-field" placeholder="11" min="1" max="40">
+                            <p style="font-size: 0.75rem; margin-top: 0.5rem; color: var(--text-muted);">
+                                <i class="fas fa-info-circle"></i> Must be after contribution term ends
+                            </p>
+                            <span id="withdrawalStartError" class="error-message"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 1.5rem;">
+                    <button class="btn" onclick="calculate()">
+                        <i class="fas fa-calculator"></i> Calculate Projection
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultsSection" style="display: none;">
+            <!-- Client Summary -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-user-check"></i> Investment Summary</h2>
+                </div>
+                <div class="card-body">
+                    <div class="summary-box">
+                        <div class="summary-item">
+                            <span class="summary-label">Client Name:</span>
+                            <span class="summary-value" id="summaryName">-</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Gender:</span>
+                            <span class="summary-value" id="summaryGender">-</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Current Age:</span>
+                            <span class="summary-value" id="summaryAge">-</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Investment Type:</span>
+                            <span class="summary-value" id="summaryInvestmentType">-</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Growth Rate:</span>
+                            <span class="summary-value" id="summaryGrowthRate">-</span>
+                        </div>
+                        <div class="summary-item" style="border-top: 2px solid var(--accent); margin-top: 1rem; padding-top: 1rem;">
+                            <span class="summary-label" style="font-size: 1.1rem; font-weight: 700;">Total Contribution:</span>
+                            <span class="summary-value" style="font-size: 1.3rem;" id="summaryTotalContribution">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Break-Even Analysis -->
+            <div id="breakEvenSection" class="break-even-box">
+                <h3><i class="fas fa-trophy"></i> Break-Even Analysis</h3>
+                <p id="breakEvenText">-</p>
+            </div>
+
+            <!-- Projection Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-table"></i> 40-Year Projection Table</h2>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table id="projectionTable">
+                            <thead>
+                                <tr>
+                                    <th>Year</th>
+                                    <th>Age</th>
+                                    <th>Beginning Value</th>
+                                    <th>Annual Contribution</th>
+                                    <th>Cumulative Contribution</th>
+                                    <th>Expected Value</th>
+                                    <th>Withdrawal</th>
+                                    <th>Fee</th>
+                                    <th>Redemption Value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Growth Summary Bar Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-chart-bar"></i> Growth Summary (10, 20, 30, 40 Years)</h2>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container" style="height: 450px;">
+                        <canvas id="summaryBarChart"></canvas>
+                    </div>
+                    <div style="margin-top: 2rem;">
+                        <table style="width: 100%; background: var(--bg-card-darker);">
+                            <thead>
+                                <tr>
+                                    <th>Milestone</th>
+                                    <th>Total Contribution</th>
+                                    <th>Redemption Value</th>
+                                    <th>Growth Amount</th>
+                                    <th>Growth %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summaryTableBody">
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-chart-line"></i> Growth Projection Chart</h2>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="growthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disclaimer -->
+        <div class="card" style="background: var(--bg-card-darker); border: 2px solid var(--warning);">
+            <div class="card-body" style="padding: 1.5rem;">
+                <h3 style="color: var(--warning); font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-exclamation-triangle"></i> Disclaimer Penting
+                </h3>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; text-align: justify;">
+                    Proyeksi dan ilustrasi yang disediakan oleh kalkulator ini adalah untuk <strong>TUJUAN ESTIMASI SAJA</strong> dan tidak boleh dianggap sebagai penawaran resmi atau mengikat dari penyedia asuransi / investasi manapun. 
+                    Nilai aktual dapat bervariasi berdasarkan kondisi pasar, ketentuan polis, dan faktor-faktor lainnya. Untuk informasi yang akurat dan mengikat, silakan meminta penawaran resmi dan ilustrasi polis dari perusahaan asuransi / investasi. 
+                    Semua hak, kewajiban, syarat, ketentuan, dan pengecualian diatur oleh dokumen Polis resmi yang dikeluarkan oleh penyedia terkait.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Fee structures
+        const feeStructures = {
+            lumpsum: [7.84, 0.04, 0.04, 0.04, 0.04], // Years 1-5, then 0%
+            installment5: [24.75, 3.56, 0.10, 0.10, 0.09], // Years 1-5, then 0%
+            installment10: [49.50, 8.22, 0.11, 0.11, 0.10, 0.10, 0.10, 0.10, 0.09, 0.09] // Years 1-10, then 0%
+        };
+
+        let calculationData = null;
+        let growthChart = null;
+
+        // Format currency
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(amount);
+        }
+
+        // Parse DOB and calculate age
+        function calculateAge(dobString) {
+            const parts = dobString.split('/');
+            if (parts.length !== 3) return null;
+            
+            const day = parseInt(parts[0]);
+            const month = parseInt(parts[1]) - 1;
+            const year = parseInt(parts[2]);
+            
+            if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+            
+            const dob = new Date(year, month, day);
+            const today = new Date();
+            let age = today.getFullYear() - dob.getFullYear();
+            const monthDiff = today.getMonth() - dob.getMonth();
+            
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+                age--;
+            }
+            
+            return age;
+        }
+
+        // Get fee rate for a given year
+        function getFeeRate(year, investmentType, term) {
+            if (investmentType === 'lumpsum') {
+                if (year <= 5) return feeStructures.lumpsum[year - 1];
+                return 0; // Year 6+ = 0%
+            } else {
+                if (term === 5) {
+                    if (year <= 5) return feeStructures.installment5[year - 1];
+                    return 0; // Year 6+ = 0%
+                } else if (term === 10) {
+                    if (year <= 10) return feeStructures.installment10[year - 1];
+                    return 0; // Year 11+ = 0%
+                }
+            }
+            return 0;
+        }
+
+        // Validate inputs
+        function validateInputs() {
+            let isValid = true;
+            
+            // Clear previous errors
+            document.querySelectorAll('.error-message').forEach(el => el.textContent = '');
+            
+            // Validate name
+            const name = document.getElementById('clientName').value.trim();
+            if (name.length < 2) {
+                document.getElementById('nameError').textContent = 'Please enter a valid name (min 2 characters)';
+                isValid = false;
+            }
+            
+            // Validate gender
+            const gender = document.getElementById('gender').value;
+            if (!gender) {
+                document.getElementById('genderError').textContent = 'Please select a gender';
+                isValid = false;
+            }
+            
+            // Validate DOB
+            const dob = document.getElementById('dob').value;
+            const age = calculateAge(dob);
+            if (!age || age < 18 || age > 80) {
+                document.getElementById('dobError').textContent = 'Please enter a valid date (age must be 18-80)';
+                isValid = false;
+            }
+            
+            // Validate investment type
+            const investmentType = document.querySelector('input[name="investmentType"]:checked');
+            if (!investmentType) {
+                document.getElementById('investmentTypeError').textContent = 'Please select an investment type';
+                isValid = false;
+            }
+            
+            // Validate installment-specific fields
+            if (investmentType && investmentType.value === 'installment') {
+                const frequency = document.querySelector('input[name="frequency"]:checked');
+                if (!frequency) {
+                    document.getElementById('frequencyError').textContent = 'Please select payment frequency';
+                    isValid = false;
+                }
+                
+                const term = document.getElementById('term').value;
+                if (!term) {
+                    document.getElementById('termError').textContent = 'Please select payment term';
+                    isValid = false;
+                }
+            }
+            
+            // Validate contribution amount
+            const contributionStr = document.getElementById('contributionAmount').value.replace(/[$,]/g, '');
+            const contribution = parseFloat(contributionStr);
+            if (isNaN(contribution) || contribution <= 0) {
+                document.getElementById('contributionError').textContent = 'Please enter a valid contribution amount';
+                isValid = false;
+            }
+            
+            // Validate growth rate
+            const growthRate = document.getElementById('growthRate').value;
+            if (!growthRate) {
+                document.getElementById('growthRateError').textContent = 'Please select a growth rate';
+                isValid = false;
+            }
+            
+            // Validate withdrawal fields if withdrawal is enabled
+            const withdrawal = document.querySelector('input[name="withdrawal"]:checked');
+            if (withdrawal && withdrawal.value === 'yes') {
+                const withdrawalAmountStr = document.getElementById('withdrawalAmount').value.replace(/[$,]/g, '');
+                const withdrawalAmount = parseFloat(withdrawalAmountStr);
+                if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
+                    document.getElementById('withdrawalAmountError').textContent = 'Please enter a valid withdrawal amount';
+                    isValid = false;
+                }
+                
+                const withdrawalStartYear = parseInt(document.getElementById('withdrawalStartYear').value);
+                const term = investmentType && investmentType.value === 'installment' ? parseInt(document.getElementById('term').value) : 0;
+                
+                if (isNaN(withdrawalStartYear) || withdrawalStartYear < 1 || withdrawalStartYear > 40) {
+                    document.getElementById('withdrawalStartError').textContent = 'Please enter a year between 1 and 40';
+                    isValid = false;
+                } else if (investmentType && investmentType.value === 'installment' && withdrawalStartYear <= term) {
+                    document.getElementById('withdrawalStartError').textContent = `Must be after year ${term} (after contribution term)`;
+                    isValid = false;
+                }
+            }
+            
+            return isValid;
+        }
+
+        // Calculate projections
+        function calculate() {
+            if (!validateInputs()) {
+                return;
+            }
+            
+            // Get input values
+            const name = document.getElementById('clientName').value.trim();
+            const gender = document.getElementById('gender').value;
+            const dob = document.getElementById('dob').value;
+            const age = calculateAge(dob);
+            const investmentType = document.querySelector('input[name="investmentType"]:checked').value;
+            const contributionStr = document.getElementById('contributionAmount').value.replace(/[$,]/g, '');
+            const contributionAmount = parseFloat(contributionStr);
+            const growthRate = parseFloat(document.getElementById('growthRate').value) / 100;
+            
+            let frequency = null;
+            let term = null;
+            let annualContribution = 0;
+            
+            if (investmentType === 'lumpsum') {
+                annualContribution = contributionAmount; // Only in year 1
+                term = 0;
+            } else {
+                frequency = document.querySelector('input[name="frequency"]:checked').value;
+                term = parseInt(document.getElementById('term').value);
+                
+                if (frequency === 'yearly') {
+                    annualContribution = contributionAmount;
+                } else if (frequency === 'monthly') {
+                    annualContribution = contributionAmount * 12;
+                }
+            }
+            
+            // Withdrawal settings
+            const hasWithdrawal = document.querySelector('input[name="withdrawal"]:checked').value === 'yes';
+            let withdrawalAmount = 0;
+            let withdrawalStartYear = 0;
+            
+            if (hasWithdrawal) {
+                const withdrawalStr = document.getElementById('withdrawalAmount').value.replace(/[$,]/g, '');
+                withdrawalAmount = parseFloat(withdrawalStr);
+                withdrawalStartYear = parseInt(document.getElementById('withdrawalStartYear').value);
+            }
+            
+            // Calculate projections for 40 years
+            const projections = [];
+            let breakEvenYear = null;
+            let cumulativeContribution = 0;
+            let beginningValue = 0;
+            let cumulativeWithdrawal = 0; // NEW TRACKER
+            
+            for (let year = 1; year <= 40; year++) {
+                const currentAge = age + year - 1;
+                
+                // Annual contribution
+                let yearlyContribution = 0;
+                if (investmentType === 'lumpsum') {
+                    yearlyContribution = year === 1 ? contributionAmount : 0;
+                } else {
+                    yearlyContribution = year <= term ? annualContribution : 0;
+                }
+                
+                cumulativeContribution += yearlyContribution;
+                
+                // Expected value before withdrawal and fees
+                const expectedValue = (beginningValue + yearlyContribution) * (1 + growthRate);
+                
+                // Withdrawal
+                const annualWithdrawal = (hasWithdrawal && year >= withdrawalStartYear) ? withdrawalAmount : 0; // Renamed to avoid conflict
+                cumulativeWithdrawal += annualWithdrawal; // UPDATE NEW TRACKER
+                
+                // Fee
+                const feeRate = getFeeRate(year, investmentType, term);
+                const fee = expectedValue * (feeRate / 100);
+                
+                // Redemption value
+                const redemptionValue = expectedValue - annualWithdrawal - fee;
+                
+                projections.push({
+                    year: year,
+                    age: currentAge,
+                    beginningValue: beginningValue,
+                    annualContribution: yearlyContribution,
+                    cumulativeContribution: cumulativeContribution,
+                    expectedValue: expectedValue,
+                    annualWithdrawal: annualWithdrawal, // Renamed in array
+                    withdrawal: annualWithdrawal, // Keep old name for backward compatibility in table update
+                    cumulativeWithdrawal: cumulativeWithdrawal, // NEW METRIC
+                    totalValueRealized: totalValueRealized, // NEW METRIC
+                    fee: fee,
+                    redemptionValue: redemptionValue
+                });
+                
+                // Find break-even year
+                // Break-even is when Total Value Realized (Redemption + Cumulative Withdrawal) exceeds Cumulative Contribution
+                if (!breakEvenYear && totalValueRealized >= cumulativeContribution) { 
+                    breakEvenYear = year;
+                }
+                
+                // Set beginning value for next year
+                beginningValue = redemptionValue;
+            }
+            
+            // Store calculation data
+            calculationData = {
+                name: name,
+                gender: gender,
+                age: age,
+                investmentType: investmentType,
+                frequency: frequency,
+                term: term,
+                contributionAmount: contributionAmount,
+                annualContribution: annualContribution,
+                growthRate: growthRate,
+                hasWithdrawal: hasWithdrawal,
+                withdrawalAmount: withdrawalAmount,
+                withdrawalStartYear: withdrawalStartYear,
+                projections: projections,
+                breakEvenYear: breakEvenYear
+            };
+            
+            // Update UI
+            updateSummary();
+            updateBreakEven();
+            updateTable();
+            updateSummaryChart();
+            updateChart();
+            
+            // Show results
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('downloadPdfBtn').classList.remove('hidden');
+            
+            // Scroll to results
+            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Update summary section
+        function updateSummary() {
+            document.getElementById('summaryName').textContent = calculationData.name;
+            document.getElementById('summaryGender').textContent = calculationData.gender;
+            document.getElementById('summaryAge').textContent = calculationData.age + ' years';
+            
+            let investmentTypeText = '';
+            if (calculationData.investmentType === 'lumpsum') {
+                investmentTypeText = 'Lump Sum';
+            } else {
+                const freqText = calculationData.frequency === 'yearly' ? 'Yearly' : 'Monthly';
+                investmentTypeText = `Installment (${freqText}, ${calculationData.term} years)`;
+            }
+            document.getElementById('summaryInvestmentType').textContent = investmentTypeText;
+            
+            const growthRatePercent = (calculationData.growthRate * 100).toFixed(0);
+            document.getElementById('summaryGrowthRate').textContent = growthRatePercent + '%';
+            
+            const lastProjection = calculationData.projections[calculationData.projections.length - 1];
+            document.getElementById('summaryTotalContribution').textContent = formatCurrency(lastProjection.cumulativeContribution);
+        }
+
+        // Update break-even section
+        function updateBreakEven() {
+            const breakEvenYear = calculationData.breakEvenYear;
+            
+            if (breakEvenYear) {
+                const breakEvenData = calculationData.projections[breakEvenYear - 1];
+                const text = `Your investment breaks even at Year ${breakEvenYear} (Age ${breakEvenData.age}). 
+                At this point, your Redemption Value (${formatCurrency(breakEvenData.redemptionValue)}) exceeds your Cumulative Contribution (${formatCurrency(breakEvenData.cumulativeContribution)}).`;
+                document.getElementById('breakEvenText').textContent = text;
+            } else {
+                document.getElementById('breakEvenText').textContent = 'Break-even point not reached within 40 years.';
+            }
+        }
+
+        // Update table
+        function updateTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            calculationData.projections.forEach(data => {
+                const row = document.createElement('tr');
+                
+                // Highlight break-even year
+                if (data.year === calculationData.breakEvenYear) {
+                    row.style.background = 'rgba(16, 185, 129, 0.2)';
+                    row.style.borderLeft = '4px solid var(--success)';
+                }
+                
+                // Highlight term end
+                if (calculationData.investmentType === 'installment' && data.year === calculationData.term) {
+                    row.style.background = 'rgba(100, 255, 218, 0.1)';
+                    row.style.borderLeft = '4px solid var(--accent)';
+                }
+                
+                // Highlight withdrawal start
+                if (calculationData.hasWithdrawal && data.year === calculationData.withdrawalStartYear) {
+                    row.style.background = 'rgba(245, 158, 11, 0.1)';
+                    row.style.borderLeft = '4px solid var(--warning)';
+                }
+                
+                row.innerHTML = `
+                    <td>${data.year}</td>
+                    <td>${data.age}</td>
+                    <td>${formatCurrency(data.beginningValue)}</td>
+                    <td>${formatCurrency(data.annualContribution)}</td>
+                    <td>${formatCurrency(data.cumulativeContribution)}</td>
+                    <td>${formatCurrency(data.expectedValue)}</td>
+                    <td>${formatCurrency(data.withdrawal)}</td>
+                    <td>${formatCurrency(data.fee)}</td>
+                    <td>${formatCurrency(data.redemptionValue)}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        // Update chart
+        function updateChart() {
+            const ctx = document.getElementById('growthChart').getContext('2d');
+            
+            // Destroy existing chart
+            if (growthChart) {
+                growthChart.destroy();
+            }
+            
+            const labels = calculationData.projections.map(p => p.year);
+            const ageLabels = calculationData.projections.map(p => p.age);
+            const cumulativeData = calculationData.projections.map(p => p.cumulativeContribution);
+            // UPDATED: Use totalValueRealized instead of redemptionValue
+            const redemptionData = calculationData.projections.map(p => p.totalValueRealized); 
+            
+            growthChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Cumulative Contribution',
+                            data: cumulativeData,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            pointRadius: 0
+                        },
+                        {
+                            // UPDATED LABEL
+                            label: 'Total Value Realized (Remaining + Withdrawn)', 
+                            data: redemptionData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    // ... (rest of options remain the same)
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#e2e8f0',
+                                font: {
+                                    family: 'Montserrat',
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: '#172a46',
+                            titleColor: '#64ffda',
+                            bodyColor: '#e2e8f0',
+                            borderColor: '#64ffda',
+                            borderWidth: 1,
+                            callbacks: {
+                                title: function(context) {
+                                    const yearIndex = context[0].dataIndex;
+                                    const year = calculationData.projections[yearIndex].year;
+                                    const age = calculationData.projections[yearIndex].age;
+                                    return `Year ${year} | Age ${age}`;
+                                },
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += formatCurrency(context.parsed.y);
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Year',
+                                color: '#a8b2c1',
+                                font: {
+                                    family: 'Montserrat',
+                                    size: 12
+                                }
+                            },
+                            ticks: {
+                                color: '#a8b2c1'
+                            },
+                            grid: {
+                                color: 'rgba(168, 178, 193, 0.1)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Amount (USD)',
+                                color: '#a8b2c1',
+                                font: {
+                                    family: 'Montserrat',
+                                    size: 12
+                                }
+                            },
+                            ticks: {
+                                color: '#a8b2c1',
+                                callback: function(value) {
+                                    return formatCurrency(value);
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(168, 178, 193, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update summary bar chart
+        let summaryBarChart = null;
+        
+        function updateSummaryChart() {
+            const ctx = document.getElementById('summaryBarChart').getContext('2d');
+            
+            // Destroy existing chart
+            if (summaryBarChart) {
+                summaryBarChart.destroy();
+            }
+            
+            // Get data for years 10, 20, 30, 40
+            const milestones = [10, 20, 30, 40];
+            const summaryData = milestones.map(year => {
+                const data = calculationData.projections[year - 1];
+                
+                // Use Total Value Realized for Growth calculation
+                const totalValueRealized = data.totalValueRealized;
+                const netProfitLoss = totalValueRealized - data.cumulativeContribution; // NET PROFIT
+                const netGrowthPercent = (netProfitLoss / data.cumulativeContribution) * 100;
+                
+                return {
+                    year: year,
+                    contribution: data.cumulativeContribution,
+                    redemption: data.redemptionValue, // Keep for table display
+                    cumulativeWithdrawal: data.cumulativeWithdrawal, // NEW METRIC
+                    totalValueRealized: totalValueRealized, // NEW METRIC for bar chart
+                    netProfitLoss: netProfitLoss, // NEW METRIC
+                    netGrowthPercent: netGrowthPercent // NEW METRIC
+                };
+            });
+            
+            // Update summary table (Adjusted headers)
+            const tbody = document.getElementById('summaryTableBody');
+            tbody.innerHTML = '';
+
+            // Update Table Headers for accuracy
+            const summaryTable = tbody.closest('table');
+            const newThead = `
+                <thead>
+                    <tr>
+                        <th>Milestone</th>
+                        <th>Total Contribution</th>
+                        <th>Cumulative Withdrawal</th>
+                        <th>Redemption Value</th>
+                        <th>Net Profit/Loss</th>
+                        <th>Net Growth %</th>
+                    </tr>
+                </thead>
+            `;
+            summaryTable.querySelector('thead').innerHTML = newThead;
+            
+            summaryData.forEach(data => {
+                const row = document.createElement('tr');
+                
+                // Color logic for Net Profit/Loss
+                const profitColor = data.netProfitLoss >= 0 ? 'var(--success)' : 'var(--danger)';
+                const percentColor = data.netProfitLoss >= 0 ? 'var(--accent)' : 'var(--danger)';
+                
+                row.innerHTML = `
+                    <td style="font-weight: 600;">Year ${data.year}</td>
+                    <td>${formatCurrency(data.contribution)}</td>
+                    <td>${formatCurrency(data.cumulativeWithdrawal)}</td>
+                    <td>${formatCurrency(data.redemption)}</td>
+                    <td style="color: ${profitColor}; font-weight: 600;">${formatCurrency(data.netProfitLoss)}</td>
+                    <td style="color: ${percentColor}; font-weight: 700;">${data.netGrowthPercent.toFixed(2)}%</td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            // Create bar chart (UPDATED: Redemption Value now Total Value Realized)
+            summaryBarChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: milestones.map(y => `Year ${y}`),
+                    datasets: [
+                        {
+                            label: 'Total Contribution',
+                            data: summaryData.map(d => d.contribution),
+                            backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                            borderColor: '#f59e0b',
+                            borderWidth: 2
+                        },
+                        {
+                            // UPDATED: Data is Total Value Realized
+                            label: 'Total Value Realized', 
+                            data: summaryData.map(d => d.totalValueRealized),
+                            backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                            borderColor: '#10b981',
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#e2e8f0',
+                                font: {
+                                    family: 'Montserrat',
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#172a46',
+                            titleColor: '#64ffda',
+                            bodyColor: '#e2e8f0',
+                            borderColor: '#64ffda',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += formatCurrency(context.parsed.y);
+                                    
+                                    // Add Net Profit/Loss info for Total Value Realized
+                                    if (context.datasetIndex === 1) {
+                                        const yearIndex = context.dataIndex;
+                                        const data = summaryData[yearIndex];
+                                        label += '\nNet Profit: ' + formatCurrency(data.netProfitLoss);
+                                        label += ' (' + data.netGrowthPercent.toFixed(2) + '%)';
+                                    }
+                                    
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#a8b2c1',
+                                font: {
+                                    family: 'Montserrat',
+                                    size: 11
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(168, 178, 193, 0.1)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Amount (USD)',
+                                color: '#a8b2c1',
+                                font: {
+                                    family: 'Montserrat',
+                                    size: 12
+                                }
+                            },
+                            ticks: {
+                                color: '#a8b2c1',
+                                callback: function(value) {
+                                    return formatCurrency(value);
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(168, 178, 193, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+
+        // Download PDF
+        function downloadPDF() {
+            if (!calculationData) {
+                alert('Please calculate projection first before downloading PDF');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Colors
+            const navyBlue = [25, 55, 109];
+            const gold = [212, 175, 55];
+            const lightGray = [245, 245, 245];
+            const darkText = [40, 40, 40];
+            const white = [255, 255, 255];
+
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 15;
+
+            // Header
+            doc.setFillColor(...navyBlue);
+            doc.rect(0, 0, pageWidth, 40, 'F');
+            doc.setFillColor(...gold);
+            doc.rect(0, 40, pageWidth, 2, 'F');
+            
+            doc.setTextColor(...white);
+            doc.setFontSize(22);
+            doc.setFont('helvetica', 'bold');
+            doc.text('DCA Investment Report', pageWidth / 2, 20, { align: 'center' });
+            
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text('40-Year Projection Summary', pageWidth / 2, 32, { align: 'center' });
+
+            let yPos = 50;
+
+            // Client Information
+            doc.setFillColor(...lightGray);
+            doc.roundedRect(margin, yPos, pageWidth - 2 * margin, 45, 3, 3, 'F');
+            doc.setFillColor(...gold);
+            doc.rect(margin, yPos, 3, 45, 'F');
+            
+            doc.setTextColor(...navyBlue);
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Investment Summary', margin + 6, yPos + 8);
+
+            doc.setTextColor(...darkText);
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            
+            let investmentTypeText = '';
+            if (calculationData.investmentType === 'lumpsum') {
+                investmentTypeText = 'Lump Sum';
+            } else {
+                const freqText = calculationData.frequency === 'yearly' ? 'Yearly' : 'Monthly';
+                investmentTypeText = `Installment (${freqText}, ${calculationData.term} years)`;
+            }
+            
+            const clientInfo = [
+                ['Name:', calculationData.name + ' (' + calculationData.gender + ')'],
+                ['Age:', calculationData.age + ' years old'],
+                ['Investment Type:', investmentTypeText],
+                ['Growth Rate:', (calculationData.growthRate * 100).toFixed(0) + '%'],
+                ['Total Contribution:', formatCurrency(calculationData.projections[39].cumulativeContribution)]
+            ];
+
+            let infoY = yPos + 18;
+            clientInfo.forEach(([label, value]) => {
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...navyBlue);
+                doc.text(label, margin + 8, infoY);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...darkText);
+                doc.text(value, margin + 55, infoY);
+                infoY += 7;
+            });
+
+            yPos += 51;
+
+            // Break-Even
+            if (calculationData.breakEvenYear) {
+                const breakEvenData = calculationData.projections[calculationData.breakEvenYear - 1];
+                
+                doc.setFillColor(16, 185, 129);
+                doc.roundedRect(margin, yPos, pageWidth - 2 * margin, 18, 3, 3, 'F');
+                
+                doc.setTextColor(...white);
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Break-Even Analysis', pageWidth / 2, yPos + 7, { align: 'center' });
+                
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'normal');
+                const breakEvenText = `Year ${calculationData.breakEvenYear} (Age ${breakEvenData.age}) - Redemption: ${formatCurrency(breakEvenData.redemptionValue)}`;
+                doc.text(breakEvenText, pageWidth / 2, yPos + 13, { align: 'center' });
+                
+                yPos += 24;
+            }
+
+            // Projection Table
+            doc.setTextColor(...navyBlue);
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text('40-Year Projection Table', margin, yPos);
+            yPos += 6;
+
+            // Table header
+            doc.setFillColor(...navyBlue);
+            doc.rect(margin, yPos, pageWidth - 2 * margin, 7, 'F');
+            doc.setTextColor(...white);
+            doc.setFontSize(6);
+            doc.setFont('helvetica', 'bold');
+            
+            const headers = ['Yr', 'Age', 'Begin', 'Contrib', 'Cumul', 'Expected', 'Withdr', 'Fee', 'Redemp'];
+            const colWidths = [8, 10, 18, 18, 18, 20, 16, 14, 20];
+            let xPos = margin + 2;
+            headers.forEach((header, i) => {
+                doc.text(header, xPos, yPos + 4.5);
+                xPos += colWidths[i];
+            });
+            
+            yPos += 7;
+
+            // Table rows
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...darkText);
+            doc.setFontSize(5.5);
+            
+            calculationData.projections.forEach((data, index) => {
+                if (yPos > pageHeight - 30) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+                
+                // Alternate row colors
+                if (index % 2 === 0) {
+                    doc.setFillColor(...lightGray);
+                    doc.rect(margin, yPos, pageWidth - 2 * margin, 4.5, 'F');
+                }
+                
+                // Highlight break-even year
+                if (data.year === calculationData.breakEvenYear) {
+                    doc.setFillColor(16, 185, 129);
+                    doc.setDrawColor(16, 185, 129);
+                    doc.setLineWidth(0.5);
+                    doc.rect(margin, yPos, pageWidth - 2 * margin, 4.5, 'FD');
+                }
+                
+                xPos = margin + 2;
+                const rowData = [
+                    String(data.year),
+                    String(data.age),
+                    formatCurrency(data.beginningValue).replace('$', '').replace(',', ''),
+                    formatCurrency(data.annualContribution).replace('$', '').replace(',', ''),
+                    formatCurrency(data.cumulativeContribution).replace('$', '').replace(',', ''),
+                    formatCurrency(data.expectedValue).replace('$', '').replace(',', ''),
+                    formatCurrency(data.withdrawal).replace('$', '').replace(',', ''),
+                    formatCurrency(data.fee).replace('$', '').replace(',', ''),
+                    formatCurrency(data.redemptionValue).replace('$', '').replace(',', '')
+                ];
+                
+                rowData.forEach((value, i) => {
+                    doc.text(value, xPos, yPos + 3);
+                    xPos += colWidths[i];
+                });
+                
+                yPos += 4.5;
+            });
+
+            // ============================================================================
+            // NEW PAGE: Growth Summary Bar Chart
+            // ============================================================================
+            doc.addPage();
+            yPos = 20;
+
+            // Page Title
+            doc.setTextColor(...navyBlue);
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Growth Summary (10, 20, 30, 40 Years)', pageWidth / 2, yPos, { align: 'center' });
+            yPos += 10;
+
+            // Add Bar Chart Image
+            if (summaryBarChart) {
+                const barChartImage = summaryBarChart.toBase64Image();
+                const chartWidth = pageWidth - 2 * margin;
+                const chartHeight = 90;
+                doc.addImage(barChartImage, 'PNG', margin, yPos, chartWidth, chartHeight);
+                yPos += chartHeight + 10;
+            }
+
+            // Summary Table
+            doc.setTextColor(...navyBlue);
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Growth Milestones Summary', margin, yPos);
+            yPos += 6;
+
+            // Table header
+            doc.setFillColor(...navyBlue);
+            doc.rect(margin, yPos, pageWidth - 2 * margin, 7, 'F');
+            doc.setTextColor(...white);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            
+            const summaryHeaders = ['Milestone', 'Contribution', 'Redemption', 'Growth', 'Growth %'];
+            const summaryColWidths = [25, 32, 32, 32, 25];
+            xPos = margin + 2;
+            summaryHeaders.forEach((header, i) => {
+                doc.text(header, xPos, yPos + 4.5);
+                xPos += summaryColWidths[i];
+            });
+            
+            yPos += 7;
+
+            // Summary table rows
+            const milestones = [10, 20, 30, 40];
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...darkText);
+            doc.setFontSize(7);
+            
+            milestones.forEach((year, index) => {
+                const data = calculationData.projections[year - 1];
+                const growthAmount = data.redemptionValue - data.cumulativeContribution;
+                const growthPercent = (growthAmount / data.cumulativeContribution) * 100;
+                
+                // Alternate row colors
+                if (index % 2 === 0) {
+                    doc.setFillColor(...lightGray);
+                    doc.rect(margin, yPos, pageWidth - 2 * margin, 6, 'F');
+                }
+                
+                xPos = margin + 2;
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Year ${year}`, xPos, yPos + 4);
+                xPos += summaryColWidths[0];
+                
+                doc.setFont('helvetica', 'normal');
+                doc.text(formatCurrency(data.cumulativeContribution), xPos, yPos + 4);
+                xPos += summaryColWidths[1];
+                doc.text(formatCurrency(data.redemptionValue), xPos, yPos + 4);
+                xPos += summaryColWidths[2];
+                
+                doc.setTextColor(16, 185, 129);
+                doc.setFont('helvetica', 'bold');
+                doc.text(formatCurrency(growthAmount), xPos, yPos + 4);
+                xPos += summaryColWidths[3];
+                
+                doc.setTextColor(100, 255, 218);
+                doc.text(growthPercent.toFixed(2) + '%', xPos, yPos + 4);
+                
+                doc.setTextColor(...darkText);
+                yPos += 6;
+            });
+
+            // ============================================================================
+            // NEW PAGE: Growth Projection Line Chart
+            // ============================================================================
+            doc.addPage();
+            yPos = 20;
+
+            // Page Title
+            doc.setTextColor(...navyBlue);
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text('40-Year Growth Projection Chart', pageWidth / 2, yPos, { align: 'center' });
+            yPos += 10;
+
+            // Add Line Chart Image
+            if (growthChart) {
+                const lineChartImage = growthChart.toBase64Image();
+                const chartWidth = pageWidth - 2 * margin;
+                const chartHeight = 120;
+                doc.addImage(lineChartImage, 'PNG', margin, yPos, chartWidth, chartHeight);
+                yPos += chartHeight + 10;
+            }
+
+            // Chart Legend/Description
+            doc.setFillColor(...lightGray);
+            doc.roundedRect(margin, yPos, pageWidth - 2 * margin, 25, 3, 3, 'F');
+            
+            doc.setTextColor(...navyBlue);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Chart Analysis', margin + 4, yPos + 6);
+            
+            doc.setTextColor(...darkText);
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'normal');
+            
+            const chartDesc = `This chart shows the growth of your investment over 40 years. The orange line represents your cumulative contributions, while the green line shows the redemption value including growth. The gap between the lines represents your investment gains.`;
+            const splitDesc = doc.splitTextToSize(chartDesc, pageWidth - 2 * margin - 8);
+            doc.text(splitDesc, margin + 4, yPos + 12);
+
+            // ============================================================================
+            // DISCLAIMER PAGE
+            // ============================================================================
+            yPos += 35;
+            
+            if (yPos > pageHeight - 50) {
+                doc.addPage();
+                yPos = 20;
+            }
+            
+            doc.setFillColor(255, 250, 230);
+            doc.roundedRect(margin, yPos, pageWidth - 2 * margin, 28, 3, 3, 'F');
+            
+            doc.setTextColor(245, 158, 11);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.text('! Disclaimer Penting', margin + 4, yPos + 6);
+            
+            doc.setTextColor(80, 80, 80);
+            doc.setFontSize(6);
+            doc.setFont('helvetica', 'normal');
+            
+            const disclaimerText = 'Proyeksi yang disediakan adalah untuk TUJUAN ESTIMASI SAJA. Nilai aktual dapat bervariasi berdasarkan kondisi pasar dan ketentuan polis. Untuk informasi yang akurat, silakan meminta penawaran resmi dari perusahaan asuransi / investasi.';
+            
+            const splitDisclaimer = doc.splitTextToSize(disclaimerText, pageWidth - 2 * margin - 8);
+            doc.text(splitDisclaimer, margin + 4, yPos + 12);
+
+            // Footer on all pages
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(6);
+                doc.setTextColor(120, 120, 120);
+                doc.setFont('helvetica', 'italic');
+                doc.text('Generated on: ' + new Date().toLocaleDateString('en-US', { 
+                    year: 'numeric', month: 'long', day: 'numeric', 
+                    hour: '2-digit', minute: '2-digit' 
+                }), pageWidth / 2, pageHeight - 5, { align: 'center' });
+                doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 5, { align: 'right' });
+            }
+
+            // Save PDF
+            const fileName = 'DCA_Investment_' + calculationData.name.replace(/\s+/g, '_') + '_' + 
+                new Date().toISOString().split('T')[0] + '.pdf';
+            doc.save(fileName);
+        }
+
+        // Event listeners for conditional fields
+        document.querySelectorAll('input[name="investmentType"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const installmentFields = document.getElementById('installmentFields');
+                if (this.value === 'installment') {
+                    installmentFields.classList.add('active');
+                } else {
+                    installmentFields.classList.remove('active');
+                }
+            });
+        });
+
+        document.querySelectorAll('input[name="withdrawal"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const withdrawalFields = document.getElementById('withdrawalFields');
+                if (this.value === 'yes') {
+                    withdrawalFields.classList.add('active');
+                } else {
+                    withdrawalFields.classList.remove('active');
+                }
+            });
+        });
+
+        // Auto-format contribution amount input
+        document.getElementById('contributionAmount').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/[^0-9]/g, '');
+            if (value) {
+                value = parseInt(value).toLocaleString('en-US');
+                e.target.value = '$' + value;
+            }
+        });
+
+        // Auto-format withdrawal amount input
+        document.getElementById('withdrawalAmount').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/[^0-9]/g, '');
+            if (value) {
+                value = parseInt(value).toLocaleString('en-US');
+                e.target.value = '$' + value;
+            }
+        });
+
+        // Auto-format DOB input
+        document.getElementById('dob').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/[^0-9]/g, '');
+            if (value.length >= 2) {
+                value = value.substring(0, 2) + '/' + value.substring(2);
+            }
+            if (value.length >= 5) {
+                value = value.substring(0, 5) + '/' + value.substring(5, 9);
+            }
+            e.target.value = value;
+        });
+
+        // Load user information and setup logout
+        window.addEventListener('DOMContentLoaded', function() {
+            try {
+                const authData = JSON.parse(sessionStorage.getItem('waterfallAuth') || '{}');
+                
+                if (!authData.authenticated) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                document.getElementById('userEmail').textContent = authData.email || 'Unknown';
+
+                // Setup logout
+                document.getElementById('logoutBtn').addEventListener('click', async function() {
+                    if (!confirm('Are you sure you want to logout?')) {
+                        return;
+                    }
+
+                    try {
+                        localStorage.setItem('logoutBroadcast', JSON.stringify({
+                            email: authData.email,
+                            timestamp: Date.now()
+                        }));
+                        
+                        setTimeout(() => {
+                            localStorage.removeItem('logoutBroadcast');
+                        }, 1000);
+
+                        if (window.sessionTracker) {
+                            await window.sessionTracker.stopSession();
+                        }
+                    } catch (error) {
+                        console.error('Error during logout:', error);
+                    }
+
+                    sessionStorage.removeItem('waterfallAuth');
+                    localStorage.removeItem('waterfallActiveSession');
+                    window.location.href = 'index.html';
+                });
+
+                // Listen for logout broadcast
+                window.addEventListener('storage', function(e) {
+                    if (e.key === 'logoutBroadcast') {
+                        try {
+                            const logoutData = JSON.parse(e.newValue || '{}');
+                            const currentAuth = JSON.parse(sessionStorage.getItem('waterfallAuth') || '{}');
+                            
+                            if (logoutData.email === currentAuth.email) {
+                                sessionStorage.removeItem('waterfallAuth');
+                                localStorage.removeItem('waterfallActiveSession');
+                                alert('🚪 You have been logged out from another tab.');
+                                window.location.href = 'index.html';
+                            }
+                        } catch (error) {
+                            console.error('Error processing logout broadcast:', error);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading user info:', error);
+                window.location.href = 'index.html';
+            }
+        });
+    </script>
+
+    <!-- Floating PDF Download Button -->
+    <button id="downloadPdfBtn" class="floating-pdf-btn hidden" onclick="downloadPDF()">
+        <i class="fas fa-file-pdf"></i>
+        <span>Download PDF Report</span>
+    </button>
+</body>
+</html>
