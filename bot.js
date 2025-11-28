@@ -61,11 +61,11 @@ function isSavingsProduct(productName) {
 
 const TERM_PAYMENT_OPTIONS = {
   TERM_LIFE: [
-    { value: '10 years', label: '10 years' },
-    { value: '20 years', label: '20 years' },
-    { value: '30 years', label: '30 years' },
-    { value: 'Till 85', label: 'Till 85' },
-    { value: 'Till 88', label: 'Till 88', note: 'for FWD only' }
+    { text: '10 years', value: '10 years' },
+    { text: '20 years', value: '20 years' },
+    { text: '30 years', value: '30 years' },
+    { text: 'Till 85', value: 'Till 85' },
+    { text: 'Till 88 (FWD only)', value: 'Till 88' }
   ],
   IUL: ['1 year', '5 years', '10 years'],
   SAVINGS: ['2 years', '5 years'],
@@ -494,7 +494,12 @@ bot.on('message', async (msg) => {
         const termKeyboard = {
           reply_markup: {
             inline_keyboard: [
-              ...termOptions.map(term => [{ text: term, callback_data: `term_${term}` }]),
+              ...termOptions.map(term => {
+                // Handle both string and object formats
+                const text = typeof term === 'string' ? term : term.text;
+                const value = typeof term === 'string' ? term : term.value;
+                return [{ text: text, callback_data: `term_${value}` }];
+              }),
               [{ text: '✏️ Others (custom)', callback_data: 'term_custom' }]
             ]
           }
@@ -830,7 +835,12 @@ bot.on('callback_query', async (query) => {
     termKeyboard = {
       reply_markup: {
         inline_keyboard: [
-          ...termOptions.map(term => [{ text: term, callback_data: `term_${term}` }]),
+          ...termOptions.map(term => {
+            // Handle both string and object formats
+            const text = typeof term === 'string' ? term : term.text;
+            const value = typeof term === 'string' ? term : term.value;
+            return [{ text: text, callback_data: `term_${value}` }];
+          }),
           [{ text: '✏️ Others (custom)', callback_data: 'term_custom' }]
         ]
       }
