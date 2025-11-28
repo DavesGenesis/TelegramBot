@@ -60,13 +60,7 @@ function isSavingsProduct(productName) {
 }
 
 const TERM_PAYMENT_OPTIONS = {
-  TERM_LIFE: [
-    { value: '10 years', label: '10 years' },
-    { value: '20 years', label: '20 years' },
-    { value: '30 years', label: '30 years' },
-    { value: 'Till 85', label: 'Till 85' },
-    { value: 'Till 88', label: 'Till 88', note: 'for FWD only' }
-  ],
+  TERM_LIFE: ['10 years', '20 years', '30 years', 'Till 85'],
   IUL: ['1 year', '5 years', '10 years'],
   SAVINGS: ['2 years', '5 years'],
   SINGLE_PREMI: '1'
