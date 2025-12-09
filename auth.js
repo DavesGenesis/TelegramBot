@@ -7,10 +7,21 @@ const PENDING_FILE = path.join(__dirname, 'pending-requests.json');
 // Initialize files if they don't exist
 function initAuthFiles() {
   if (!fs.existsSync(AUTH_FILE)) {
+    // Check for initial admin from environment variable
+    const initialAdmins = [];
+    if (process.env.INITIAL_ADMIN_ID) {
+      const adminIds = process.env.INITIAL_ADMIN_ID.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+      initialAdmins.push(...adminIds);
+    }
+    
     fs.writeFileSync(AUTH_FILE, JSON.stringify({
-      admins: [],
+      admins: initialAdmins,
       users: []
     }, null, 2));
+    
+    if (initialAdmins.length > 0) {
+      console.log(`✅ Initialized with ${initialAdmins.length} admin(s): ${initialAdmins.join(', ')}`);
+    }
   }
   
   if (!fs.existsSync(PENDING_FILE)) {
