@@ -42,15 +42,15 @@ const PRODUCTS = {
 // Coverage amounts by currency (for protection products)
 const COVERAGE_OPTIONS = {
   USD: ['$250,000', '$500,000', '$1,000,000'],
-  SGD: ['$250,000 SGD', '$500,000 SGD', '$1,000,000 SGD'],
+  SGD: ['$250,000 SGD', '$500,000 SGD', '$1,000,000 SGD', '$2,000,000 SGD'],
   IDR: ['IDR 250 juta', 'IDR 500 juta', 'IDR 1 milyar']
 };
 
 // Premium amounts by product (for savings products)
 const PREMIUM_OPTIONS = {
   SAVINGS_USD: ['$5,000/year', '$10,000/year', '$20,000/year'],
-  SINGLE_IDR: ['IDR 50 juta', 'IDR 100 juta', 'IDR 200 juta'],
-  SINGLE_USD: ['$25,000', '$50,000', '$100,000']
+  SINGLE_IDR: ['IDR 100 juta', 'IDR 200 juta', 'IDR 500 juta'],
+  SINGLE_USD: ['$10,000', '$50,000', '$100,000']
 };
 
 // Check if product is savings/premium based
@@ -1519,3 +1519,4 @@ bot.on('callback_query', async (query) => {
   
   // ... rest of existing callback handlers ...
 });
+
