@@ -3,9 +3,15 @@
   "version": "1.0.0",
   "description": "Telegram bot for insurance illustration requests",
   "main": "bot.js",
+  "engines": {
+    "node": "16.x"
+  },
   "scripts": {
     "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "dev": "nodemon bot.js",
+    "test-credentials": "node test-credentials.js",
+    "setup": "node setup-credentials.js",
+    "verify-env": "node verify-env.js"
   },
   "dependencies": {
     "node-telegram-bot-api": "^0.66.0",
